@@ -353,7 +353,6 @@ class AutoCompletion(GObject.GObject):
         y = top_y + yy + ycorr - line_height
         x, y = self.calculate_with_monitors(x, y, iter_location, window,
                                             xcorr=xcorr, ycorr=ycorr+line_height)
-        print(f"-------------- height: {iter_location.height}")
         return (x, y + iter_location.height)
     
     def calculate_with_monitors(self, x, y, iter_location, window, xcorr=0, ycorr=0):
