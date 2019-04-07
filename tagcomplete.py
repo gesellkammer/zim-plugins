@@ -138,12 +138,11 @@ class AutoCompletionTreeView(object):
         self.completion_tree_view.set_headers_visible(False)
 
 
-
 class AutoCompletion(GObject.GObject):
-    #todo: Make cursor visible
-    #todo: get theme color to use for frame around completion window
-    #todo: handling of modifier in Linux
 
+    # todo: Make cursor visible
+    # todo: get theme color to use for frame around completion window
+    # todo: handling of modifier in Linux
 
     # define signal (closure type, return type and arg types)
     __gsignals__ = {
@@ -190,7 +189,7 @@ class AutoCompletion(GObject.GObject):
         buffer = self.text_view.get_buffer()
         cursor = buffer.get_iter_at_mark(buffer.get_insert())
 
-        #insert activation char at cursor pos as it is not shown due to accelerator setting
+        # insert activation char at cursor pos as it is not shown due to accelerator setting
         if self.activation_char and self.char_insert:
             buffer.insert(cursor, self.activation_char)
 
@@ -211,6 +210,7 @@ class AutoCompletion(GObject.GObject):
         tree_selection = self.ac_tree_view.completion_tree_view.get_selection()
         entered_text = self.entered_text
         # filter list against input (find any)
+        
         def filter(model, path, iter):
             data = model[iter][DATA_COL]
             model[iter][VIS_COL] = entered_text.upper() in data.upper()
@@ -259,65 +259,50 @@ class AutoCompletion(GObject.GObject):
         shift_mod = event.get_state() & Gdk.ModifierType.SHIFT_MASK
         buffer = self.text_view.get_buffer()
         cursor = buffer.get_iter_at_mark(buffer.get_insert())
+        entered_chr = chr(event.keyval)
         
         # delete text from buffer and close if activation_char is identified
         if keyval_name == 'BackSpace':
             cursor.backward_chars(1)
             start = buffer.get_iter_at_mark(buffer.get_insert())
-            char = buffer.get_text(start, cursor)
+            char = buffer.get_text(start, cursor, include_hidden_chars=False)
             buffer.delete(start, cursor)
             if char == self.activation_char:
                 completion_window.destroy()
                 return
             self.entered_text = self.entered_text[:-1]
             self.update_completion_list()
-            return
-
-        if event.get_state() & Gdk.ModifierType.SHIFT_MASK and \
+        elif event.get_state() & Gdk.ModifierType.SHIFT_MASK and \
                 keyval_name == 'space' and self.plugin.preferences['space_selection']:
             self.insert_data(" ")
             completion_window.destroy()
-            return
-
-        if keyval_name == 'Return':
+        elif keyval_name == 'Return':
             self.insert_data()
             completion_window.destroy()
-            return
-
-        if keyval_name == "space":
+        elif keyval_name == "space":
             buffer.insert(cursor, " ")
             completion_window.destroy()
-            return
-
-        if keyval_name == "Tab" or keyval_name == "ISO_Left_Tab":
+        elif keyval_name == "Tab" or keyval_name == "ISO_Left_Tab":
             if self.plugin.preferences['tab_behaviour'] == 'select':
                 self.insert_data()
                 completion_window.destroy()
+                return
             else:
                 # cycle: select next item in tree
                 (model, path) = self.tree_selection.get_selected_rows()
                 current_path = path[0][0]
                 next_path = current_path + 1
                 self.tree_selection.select_path(next_path)
+        elif keyval_name in SHIFT:
             return
-
-        entered_chr = chr(event.keyval)
-        if shift_mod or keyval_name in SHIFT:
-            # to prevent that SHIFT code is added to buffer.
-            # Don't know if there is another way to handle this
-            if keyval_name in SHIFT:
-                return
+        elif shift_mod:
             buffer.insert(cursor, entered_chr)
             self.entered_text += entered_chr
             self.update_completion_list()
-            return
-
-        # for any other char without modifier
-        if not modifier:
+        elif not modifier:
             buffer.insert(cursor, entered_chr)
             self.entered_text += entered_chr
             self.update_completion_list()
-            return
 
     def insert_data(self, space=""):
         tree_selection = self.ac_tree_view.completion_tree_view.get_selection()
@@ -343,34 +328,35 @@ class AutoCompletion(GObject.GObject):
 
     def get_iter_pos(self, textview, window):
 
-        ACTKEY_CORRECTION = WIN_WIDTH - 10
-        COLUMN_INVISIBLE_CORRECTION = 0
-
+        xcorr = WIN_WIDTH
+        ycorr = 2
+        
         buffer = textview.get_buffer()
         cursor = buffer.get_iter_at_mark(buffer.get_insert())
 
         top_x, top_y = textview.get_toplevel().get_position()
         iter_location = textview.get_iter_location(cursor)
         mark_x, mark_y = iter_location.x, iter_location.y + iter_location.height
-        #calculate buffer-coordinates to coordinates within the window
+        # calculate buffer-coordinates to coordinates within the window
         win_location = textview.buffer_to_window_coords(Gtk.TextWindowType.WIDGET,
                                                         int(mark_x), int(mark_y))
-        #now find the right window --> Editor Window and the right pos on screen
+        line_height = iter_location.height // 2
+        
+        # now find the right window --> Editor Window and the right pos on screen
         win = textview.get_window(Gtk.TextWindowType.WIDGET)
         view_pos = win.get_position()
 
         xx = win_location[0] + view_pos[0]
         yy = win_location[1] + view_pos[1] + iter_location.height
 
-        x = top_x + xx + ACTKEY_CORRECTION
-        y = top_y + yy - COLUMN_INVISIBLE_CORRECTION
-
-        x, y = self.calculate_with_monitors(x, y, iter_location, window)
-
+        x = top_x + xx + xcorr
+        y = top_y + yy + ycorr - line_height
+        x, y = self.calculate_with_monitors(x, y, iter_location, window,
+                                            xcorr=xcorr, ycorr=ycorr+line_height)
+        print(f"-------------- height: {iter_location.height}")
         return (x, y + iter_location.height)
-
-
-    def calculate_with_monitors(self, x, y, iter_location, window):
+    
+    def calculate_with_monitors(self, x, y, iter_location, window, xcorr=0, ycorr=0):
         '''
         Calculate correct x,y position if multiple monitors are used
         '''
@@ -383,10 +369,12 @@ class AutoCompletion(GObject.GObject):
         if x + WIN_WIDTH >= (cursor_monitor_geom.width + cursor_monitor_geom.x):
             diff = x - (cursor_monitor_geom.width + cursor_monitor_geom.x) + WIN_WIDTH
             x = x - diff
+            x += xcorr
 
         if y + iter_location.height + WIN_HEIGHT >= (
                 cursor_monitor_geom.height + cursor_monitor_geom.y - STATUS_BAR_CORRECTION):
             diff = WIN_HEIGHT + 2 * iter_location.height
             y = y - diff
+            y += ycorr
 
         return x, y
