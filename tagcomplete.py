@@ -259,7 +259,7 @@ class AutoCompletion(GObject.GObject):
         shift_mod = event.get_state() & Gdk.ModifierType.SHIFT_MASK
         buffer = self.text_view.get_buffer()
         cursor = buffer.get_iter_at_mark(buffer.get_insert())
-        entered_chr = chr(event.keyval)
+        entered_chr = event.string
         
         # delete text from buffer and close if activation_char is identified
         if keyval_name == 'BackSpace':
