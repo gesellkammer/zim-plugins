@@ -195,7 +195,8 @@ class AutoCompletion(GObject.GObject):
 
         x, y = self.get_iter_pos(self.text_view, self.window)
         self.ac_tree_view.completion_win.move(x, y)
-        self.ac_tree_view.completion_win.show_all()
+        # self.ac_tree_view.completion_win.show_all()
+        Gtk.Window.show_all(self.ac_tree_view.completion_win)
 
         self.ac_tree_view.completion_win.connect(
             'key_press_event',
@@ -328,9 +329,7 @@ class AutoCompletion(GObject.GObject):
 
     def get_iter_pos(self, textview, window):
 
-        xcorr = WIN_WIDTH
-        ycorr = 2
-        
+
         buffer = textview.get_buffer()
         cursor = buffer.get_iter_at_mark(buffer.get_insert())
 
@@ -341,6 +340,9 @@ class AutoCompletion(GObject.GObject):
         win_location = textview.buffer_to_window_coords(Gtk.TextWindowType.WIDGET,
                                                         int(mark_x), int(mark_y))
         line_height = iter_location.height // 2
+
+        xcorr = WIN_WIDTH + line_height * 3
+        ycorr = line_height * 5
         
         # now find the right window --> Editor Window and the right pos on screen
         win = textview.get_window(Gtk.TextWindowType.WIDGET)
@@ -351,6 +353,7 @@ class AutoCompletion(GObject.GObject):
 
         x = top_x + xx + xcorr
         y = top_y + yy + ycorr - line_height
+
         x, y = self.calculate_with_monitors(x, y, iter_location, window,
                                             xcorr=xcorr, ycorr=ycorr+line_height)
         return (x, y + iter_location.height)
